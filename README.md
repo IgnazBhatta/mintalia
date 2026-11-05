@@ -95,7 +95,6 @@ is installed automatically.
   automatically to your monitor resolution.
 - Colors are generated from the wallpaper (`m3-content`), so the whole desktop
   (bar, GTK, kitty, btop, cava, Spotify, Discord, Zed) follows the current wallpaper.
-  A hand-made `skwd-wall` palette is included too.
 - **22 wallpapers** in 4K, including the default one used above.
 
 ### The terminal
@@ -152,10 +151,6 @@ noctalia msg color-scheme-set wallpaper m3-content
 The default installed wallpaper is `wallhaven-k8j6k6_3840x1600.png`.
 Nothing in `~/Pictures/Wallpapers` is overwritten if it already exists.
 
-**Palette** — the included `skwd-wall` scheme:
-
-```bash
-noctalia msg color-scheme-set custom skwd-wall
 ```
 
 **Stickers** — replace the GIFs in `~/Pictures/Stickers` and edit them in
