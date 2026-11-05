@@ -341,7 +341,6 @@ NOCT_ARGS=(
 [[ -n "$(command -v code 2>/dev/null)" ]] && NOCT_ARGS+=(--vscode)
 [[ -n "$(command -v zeditor 2>/dev/null || command -v zed 2>/dev/null)" ]] && NOCT_ARGS+=(--zed)
 install_text "$SELF_DIR/config/noctalia/config.toml" "$HOME/.config/noctalia/config.toml" noctalia "${NOCT_ARGS[@]}"
-install_copy "$SELF_DIR/config/noctalia/palettes/skwd-wall.json" "$HOME/.config/noctalia/palettes/skwd-wall.json"
 install_copy "$SELF_DIR/config/color-schemes/noctalia.colors" "$HOME/.local/share/color-schemes/noctalia.colors"
 
 # ---------------------------------------------------------------------------

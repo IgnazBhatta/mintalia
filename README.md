@@ -147,8 +147,6 @@ noctalia msg color-scheme-set wallpaper m3-content
 The default installed wallpaper is `wallhaven-k8j6k6_3840x1600.png`.
 Nothing in `~/Pictures/Wallpapers` is overwritten if it already exists.
 
-```
-
 **Stickers** — replace the GIFs in `~/Pictures/Stickers` and edit them in
 *Noctalia → Settings → Desktop widgets*. The shipped positions were authored on
 1920×1080 and are rescaled by `scripts/render.py` to the output detected at install time.
@@ -176,7 +174,7 @@ mintalia/
 │   └── avatar.jpg
 ├── config/
 │   ├── niri/                   # config.kdl + cfg/*.kdl
-│   ├── noctalia/               # config.toml + custom palette
+│   ├── noctalia/               # config.toml
 │   ├── kitty/  fastfetch/  fish/
 │   ├── gtk-3.0/  color-schemes/  kdeglobals
 │   ├── btop/  cava/  zed/
