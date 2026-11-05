@@ -71,11 +71,7 @@ is installed automatically.
 
 <div align="center">
 <img src="assets/screenshots/01-spotify.jpg" width="49%" alt="Spotify + Noctalia" />
-<img src="assets/screenshots/02-volume.jpg" width="49%" alt="Volume HUD" />
-<img src="assets/screenshots/03-recorder.jpg" width="49%" alt="Recorder" />
 <img src="assets/screenshots/04-stickers.jpg" width="49%" alt="Audio-reactive stickers" />
-<img src="assets/screenshots/05-stickers-alt.jpg" width="49%" alt="Sticker row" />
-<img src="assets/screenshots/06-apps.jpg" width="49%" alt="App launcher" />
 </div>
 
 <div align="center">
