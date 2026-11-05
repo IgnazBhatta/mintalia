@@ -1,0 +1,78 @@
+    window-rule {
+        geometry-corner-radius 0 // Set every window radius to 20
+        clip-to-geometry true
+}
+
+    window-rule {
+        background-effect {
+          blur true
+          xray false
+    }
+}
+
+    // Floating Noctalia settings window.
+    window-rule {
+        match app-id="dev.noctalia.Noctalia"
+        open-floating true
+        default-column-width { fixed 1080; }
+        default-window-height { fixed 920; }
+}
+
+    // if you use steam you will probably like these
+    window-rule {
+        match app-id="steam"
+        exclude title=r"^[Ss]team$"
+        open-floating true
+}
+
+    // Browser picture-in-picture: open floating in the corner, never steal focus.
+    // niri-pip adds workspace following on top of this.
+    window-rule {
+        match app-id=r"(?i)firefox$" title=r"(?i)^picture(?:[ -]?in[ -]?)picture$"
+        open-floating true
+        open-focused false
+        default-floating-position x=24 y=24 relative-to="bottom-right"
+}
+
+    window-rule {
+        match app-id=r"(?i)^floorp$" title=r"(?i)^picture(?:[ -]?in[ -]?)picture$"
+        open-floating true
+        open-focused false
+        default-floating-position x=24 y=24 relative-to="bottom-right"
+}
+
+    // Discord video-call "Pop Out" window: floating and unfocused so it behaves
+    // like Discord's Windows "Stay On Top" camera window. niri-pip makes it sticky.
+    window-rule {
+        match app-id=r"(?i)^discord$" title=r"(?i)^.*pop.?out.*$"
+        open-floating true
+        open-focused false
+        default-floating-position x=24 y=24 relative-to="bottom-right"
+}
+
+    // Same popout when XWayland reports an empty app-id.
+    window-rule {
+        match title=r"(?i)^discord popout$"
+        open-floating true
+        open-focused false
+        default-floating-position x=24 y=24 relative-to="bottom-right"
+}
+
+    window-rule {
+       match app-id="steam" title=r"^notificationtoasts_\d+_desktop$"
+       default-floating-position x=10 y=10 relative-to="bottom-right"
+       open-focused false
+}
+
+    layer-rule {
+        match namespace="^noctalia-wallpaper"
+        place-within-backdrop true
+}
+
+    layer-rule {
+        match namespace="^noctalia-(bar-[^\"]+|notification|dock|panel|attached-panel|osd)$"
+        background-effect {
+          xray false
+          // blur false
+    }
+}

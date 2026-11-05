@@ -1,0 +1,94 @@
+{
+  "$schema": "https://github.com/fastfetch-cli/fastfetch/raw/2.70.0/doc/json_schema.json",
+  "display": {
+    "separator": "  ",
+    "key": {
+      "width": 11
+    },
+    "color": {
+      "keys": "#C08A5A",
+      "title": "#F24130",
+      "output": "#EB746A",
+      "separator": "#3A2A22"
+    }
+  },
+  "modules": [
+    "title",
+    {
+      "type": "os",
+      "key": "OS",
+      "keyColor": "#F24E30",
+      "outputColor": "#EB7D6A"
+    },
+    {
+      "type": "host",
+      "key": "Host",
+      "keyColor": "#F25B30",
+      "outputColor": "#EB866A"
+    },
+    {
+      "type": "kernel",
+      "key": "Kernel",
+      "keyColor": "#F26830",
+      "outputColor": "#EB8F6A"
+    },
+    {
+      "type": "uptime",
+      "key": "Uptime",
+      "keyColor": "#F27530",
+      "outputColor": "#EB986A"
+    },
+    {
+      "type": "packages",
+      "key": "Packages",
+      "keyColor": "#F28330",
+      "outputColor": "#EBA06A"
+    },
+    {
+      "type": "shell",
+      "key": "Shell",
+      "keyColor": "#F29030",
+      "outputColor": "#EBA96A"
+    },
+    {
+      "type": "wm",
+      "key": "WM",
+      "keyColor": "#F29D30",
+      "outputColor": "#EBB26A"
+    },
+    {
+      "type": "terminal",
+      "key": "Terminal",
+      "keyColor": "#F2AA30",
+      "outputColor": "#EBBB6A"
+    },
+    {
+      "type": "cpu",
+      "key": "CPU",
+      "keyColor": "#F2B830",
+      "outputColor": "#EBC46A"
+    },
+    {
+      "type": "disk",
+      "key": "Disk",
+      "keyColor": "#F2C530",
+      "outputColor": "#EBCC6A"
+    },
+    {
+      "type": "memory",
+      "key": "Memory",
+      "keyColor": "#F2D230",
+      "outputColor": "#EBD56A"
+    }
+  ],
+  "logo": {
+    "type": "kitty",
+    "source": "__HOME__/.config/fastfetch/hutao.png",
+    "width": 24,
+    "height": 12,
+    "padding": {
+      "top": 0,
+      "left": 2
+    }
+  }
+}
