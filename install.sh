@@ -596,6 +596,7 @@ ensure_spotify_prefs() {
 
 setup_spicetify() {
   local spicetify_bin spotify_path prefs patch_rc rc
+  local -a patch_args
   SPOTIFY_PREFS_OK=0
 
   if ! spicetify_bin="$(resolve_spicetify)"; then
@@ -684,17 +685,19 @@ setup_spicetify() {
   fi
   if [[ -f "$HOME/.local/state/spicetify/Backup/xpui.spa" ||
         -f "$HOME/.config/spicetify/Backup/xpui.spa" ]]; then
-    "$spicetify_bin" apply
+    patch_args=(apply)
   else
-    "$spicetify_bin" backup apply
+    patch_args=(backup apply)
   fi
+  "$spicetify_bin" "${patch_args[@]}"
   patch_rc=$?
   if ((patch_rc != 0)) && [[ "$LAST_ERROR_ACTION" == retry-ok ]]; then
     patch_rc=0
   fi
   if ((patch_rc != 0)); then
     warn "Spicetify could not patch Spotify"
-    warn "Close Spotify, then run: $spicetify_bin backup apply"
+    warn "Close Spotify, then run: $spicetify_bin ${patch_args[*]}"
+    warn "If that still fails: $spicetify_bin restore backup apply"
     return 0
   fi
 
@@ -978,7 +981,8 @@ if [[ "$BROWSER" == "zen" ]]; then
   printf '  Zen: open it once, then Noctalia applies the theme on the next color change.\n'
 fi
 if [[ $SPOTIFY == 1 ]]; then
-  printf '  Spotify: if it is unthemed, close it and run "spicetify backup apply" once.\n'
+  printf '  Spotify: if it is unthemed, close it and run "spicetify apply"\n'
+  printf '           (on a fresh setup: "spicetify backup apply").\n'
   printf '  Spotify colors: Noctalia → Settings → Templates → apply "spicetify-noctalia".\n'
 fi
 if [[ "$BROWSER" == "floorp" ]]; then
