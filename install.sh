@@ -602,12 +602,27 @@ setup_spicetify() {
   spotify_path="${spotify_path%/}/"
   prefs="$HOME/.config/spotify/prefs"
 
-  install_text "$SELF_DIR/config/spicetify/config-xpui.ini" "$HOME/.config/spicetify/config-xpui.ini"
-  if [[ ! -f "$HOME/.config/spicetify/config-xpui.ini" ]]; then
+  local cfg="$HOME/.config/spicetify/config-xpui.ini"
+  local prev_cfg="$BACKUP_DIR/${cfg#/}"
+  install_text "$SELF_DIR/config/spicetify/config-xpui.ini" "$cfg"
+  if [[ ! -f "$cfg" ]]; then
     warn "Spicetify config was not written; skipping"
     return 0
   fi
-  sed -i "s|__SPOTIFY_PATH__|$spotify_path|g" "$HOME/.config/spicetify/config-xpui.ini"
+  sed -i "s|__SPOTIFY_PATH__|$spotify_path|g" "$cfg"
+  # Spicetify needs its local [Backup] section to run `apply`. Keep the one
+  # from the previous install instead of shipping machine-specific values.
+  if [[ -f "$prev_cfg" ]]; then
+    local backup_section
+    backup_section="$(awk '
+      /^\[Backup\]/ { in_backup = 1; print; next }
+      /^\[/ { in_backup = 0 }
+      in_backup { print }
+    ' "$prev_cfg")"
+    if [[ -n "$backup_section" ]]; then
+      printf '\n%s\n' "$backup_section" >> "$cfg"
+    fi
+  fi
   install_text "$SELF_DIR/config/spicetify/Themes/marketplace/color.ini" "$HOME/.config/spicetify/Themes/marketplace/color.ini"
   mkdir -p "$HOME/.config/spicetify/CustomApps/marketplace"
   backup "$HOME/.config/spicetify/CustomApps/marketplace"
