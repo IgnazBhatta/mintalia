@@ -506,6 +506,8 @@ if [[ $INSTALL_SDDM == 1 ]]; then
   for f in Main.qml SessionsChoose.qml UsersChoose.qml metadata.desktop screenshot.png; do
     sudo cp -a "$SELF_DIR/config/sddm/$f" "$SDDM_THEME/$f"
   done
+  sudo install -Dm644 "$SELF_DIR/assets/wallpapers/wallhaven-zpvrov_3840x1600.png" \
+    "$SDDM_THEME/wallpaper.png"
   TMP_CONF="$(mktemp)"
   python3 "$SELF_DIR/scripts/render.py" plain "$SELF_DIR/config/sddm/theme.conf" "$TMP_CONF" --home "$HOME"
   sudo install -Dm644 "$TMP_CONF" "$SDDM_THEME/theme.conf"

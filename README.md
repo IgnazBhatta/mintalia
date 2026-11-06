@@ -78,6 +78,12 @@ is installed automatically.
 <img src="assets/screenshots/07-wallpaper.jpg" width="70%" alt="Wallpaper" />
 </div>
 
+<div align="center">
+<img src="assets/screenshots/08-sddm.jpg" width="70%" alt="SDDM login screen" />
+<br />
+<sub>SDDM login screen · <code>wallhaven-zpvrov</code> wallpaper with a 12 px blur</sub>
+</div>
+
 ### The shell
 
 - **niri** with spring animations, custom column presets, and a clean keybind set.
@@ -104,7 +110,8 @@ is installed automatically.
 ### Apps & system
 
 - **Nautilus** with `adw-gtk3-dark`, Papirus-Dark icons, and capitaine cursors.
-- **SDDM** theme installed as `/usr/share/sddm/themes/mintalia` with its own
+- **SDDM** theme installed as `/usr/share/sddm/themes/mintalia` with the
+  `wallhaven-zpvrov` wallpaper, a 12 px blur, and its own
   `/etc/sddm.conf.d/99-mintalia.conf` (skip with `--no-sddm`).
 - **btop** + **cava** Noctalia themes, KDE color scheme, Zed theme.
 - Optional **Vesktop**, **Spotify/Spicetify**, **Wayvibes**, **Floorp/Zen**.
@@ -145,6 +152,7 @@ noctalia msg color-scheme-set wallpaper m3-content
 ```
 
 The default installed wallpaper is `wallhaven-k8j6k6_3840x1600.png`.
+The SDDM login screen uses `wallhaven-zpvrov_3840x1600.png` with a 12 px blur.
 Nothing in `~/Pictures/Wallpapers` is overwritten if it already exists.
 
 **Stickers** — replace the GIFs in `~/Pictures/Stickers` and edit them in
