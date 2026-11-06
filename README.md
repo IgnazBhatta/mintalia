@@ -40,12 +40,16 @@ After it finishes, **log out and back in** (or reboot) and pick **niri** in SDDM
 | Prompt | What happens if you say yes |
 |---|---|
 | **Discord** | Installs `vesktop-bin` and copies the Noctalia Midnight + Material themes, plus Vencord/Jord settings |
-| **Spotify** | Installs `spotify` + `spicetify-cli`, the Marketplace app, and enables Noctalia's Spicetify color sync |
+| **Spotify** | Installs `spotify` + prebuilt Spicetify (`spicetify-bin`), the Marketplace app, patches Spotify (opening it once if needed), and enables Noctalia's Spicetify color sync |
 | **Wayvibes** | Installs `wayvibes-git`, the **NK Cream** soundpack, and the bar widget state |
 | **Browser** | **Floorp** — your `userChrome`/`userContent` + the animated *Spirited Away* theme · **Zen** — recolors itself from Noctalia's palette · or skip |
 
 Everything else (niri, noctalia, kitty, fish, fastfetch, nautilus, vlc, nirimod, shelly)
 is installed automatically.
+
+If a command fails, the installer offers **Retry**, **Ignore** (skip it and continue),
+or **Abort**. In a non-interactive run it ignores the failure, keeps going, and prints
+the ignored steps at the end.
 
 ### Non-interactive
 

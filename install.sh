@@ -8,7 +8,7 @@
 # The script is intentionally boring: it installs Noctalia first, backs up
 # everything it touches, then copies the themed configs into place.
 
-set -Eeuo pipefail
+set -Euo pipefail
 
 REPO_URL="https://github.com/IgnazBhatta/mintalia"
 REPO_BRANCH="main"
@@ -25,6 +25,14 @@ BROWSER=""
 INSTALL_SDDM=1
 AUR_HELPER=""
 
+if [[ -t 0 ]]; then
+  PROMPT_TTY=/dev/stdin
+elif { : </dev/tty; } 2>/dev/null; then
+  PROMPT_TTY=/dev/tty
+else
+  PROMPT_TTY=""
+fi
+
 if [[ -t 1 ]]; then
   C_RESET=$'\033[0m'; C_BOLD=$'\033[1m'; C_GREEN=$'\033[32m'
   C_YELLOW=$'\033[33m'; C_RED=$'\033[31m'; C_MINT=$'\033[38;5;121m'
@@ -35,7 +43,109 @@ fi
 say()  { printf '%s\n' "${C_MINT}::${C_RESET} $*"; }
 ok()   { printf '%s\n' "${C_GREEN}✓${C_RESET} $*"; }
 warn() { printf '%s\n' "${C_YELLOW}!${C_RESET} $*" >&2; }
-die()  { printf '%s\n' "${C_RED}error:${C_RESET} $*" >&2; exit 1; }
+die()  { printf '%s\n' "${C_RED}error:${C_RESET} $*" >&2; print_ignored_steps; exit 1; }
+
+# ---------------------------------------------------------------------------
+# Failure handling: retry, ignore, or abort instead of exiting immediately.
+# ---------------------------------------------------------------------------
+IGNORED_STEPS=()
+ERROR_HANDLING=0
+LAST_ERROR_ACTION=""
+LAST_ERR_CMD=""
+LAST_ERR_FUNCS=""
+
+print_ignored_steps() {
+  ((${#IGNORED_STEPS[@]})) || return 0
+  printf '\n%s\n' "${C_YELLOW}Ignored steps:${C_RESET}" >&2
+  local step
+  for step in "${IGNORED_STEPS[@]}"; do
+    printf '  - %s\n' "$step" >&2
+  done
+}
+
+handle_error() {
+  local status=$?
+  set +e
+  local cmd="$BASH_COMMAND" action=""
+  local funcs="${FUNCNAME[*]:1}"
+  # In an executed script the top level reports itself as "main".
+  [[ "$funcs" == "main" ]] && funcs=""
+
+  # A non-zero `return` is just the function reporting failure; do not offer a
+  # meaningless Retry of the `return` statement itself. Failures from the real
+  # commands inside the function are handled where they happen.
+  if [[ "$cmd" == return || "$cmd" == return[[:space:]]* ]]; then
+    return 0
+  fi
+
+  # With `set -E`, the same failure reaches the trap once per function as it
+  # bubbles up. Only show the menu for the innermost occurrence.
+  if [[ -n "$LAST_ERR_CMD" && "$cmd" == "$LAST_ERR_CMD" ]]; then
+    if [[ -z "$funcs" ]]; then
+      # Back at the top level: this is the tail of the bubble.
+      if [[ -n "${LAST_ERR_FUNCS// /}" ]]; then
+        LAST_ERR_CMD=""
+        LAST_ERR_FUNCS=""
+        return 0
+      fi
+    elif [[ "$LAST_ERR_FUNCS" == *" $funcs "* ]]; then
+      return 0
+    fi
+  fi
+  LAST_ERR_CMD="$cmd"
+  LAST_ERR_FUNCS=" ${funcs} "
+
+  (( ERROR_HANDLING )) && return 0
+  ERROR_HANDLING=1
+  LAST_ERROR_ACTION=""
+
+  while true; do
+    printf '\n%s\n' "${C_RED}Command failed:${C_RESET} $cmd" >&2
+    printf 'Exit status: %s\n' "$status" >&2
+    if [[ -z "$PROMPT_TTY" ]]; then
+      action=ignore
+      warn "no terminal available; ignoring this step and continuing"
+    else
+      printf '  [R]etry  [I]gnore (skip and continue)  [A]bort\n' >&2
+      if ! read -r -p "Choose [I]: " action < "$PROMPT_TTY"; then
+        action=ignore
+        warn "could not read from the terminal; ignoring this step"
+      fi
+      action="${action:-ignore}"
+    fi
+    case "${action,,}" in
+      r|retry)
+        say "Retrying: $cmd"
+        if eval "$cmd"; then
+          LAST_ERROR_ACTION=retry-ok
+          LAST_ERR_CMD=""
+          LAST_ERR_FUNCS=""
+          ERROR_HANDLING=0
+          return 0
+        else
+          status=$?
+        fi
+        ;;
+      i|ignore|s|skip)
+        IGNORED_STEPS+=("$cmd")
+        LAST_ERROR_ACTION=ignore
+        warn "ignored: $cmd"
+        ERROR_HANDLING=0
+        return 0
+        ;;
+      a|abort|c|cancel)
+        warn "aborting at: $cmd"
+        print_ignored_steps
+        ERROR_HANDLING=0
+        exit 1
+        ;;
+      *)
+        warn "pick R, I, or A"
+        ;;
+    esac
+  done
+}
+trap 'handle_error' ERR
 
 usage() {
   cat <<'EOF'
@@ -118,14 +228,6 @@ if [[ $ASSUME_YES -eq 1 ]]; then
   [[ -z "$BROWSER" ]] && BROWSER=none
 fi
 
-if [[ -t 0 ]]; then
-  PROMPT_TTY=/dev/stdin
-elif [[ -r /dev/tty ]]; then
-  PROMPT_TTY=/dev/tty
-else
-  PROMPT_TTY=""
-fi
-
 ask_yes_no() {
   local prompt="$1" default="${2:-n}" answer=""
   if [[ $ASSUME_YES -eq 1 ]]; then
@@ -181,7 +283,7 @@ say "Requesting sudo (needed for packages and the login theme)"
 sudo -v || die "sudo is required"
 
 # Keep sudo alive for the long package step.
-( while true; do sudo -n true; sleep 50; done ) 2>/dev/null &
+( while true; do sudo -n true 2>/dev/null || true; sleep 50; done ) 2>/dev/null &
 SUDO_KEEPALIVE=$!
 trap 'kill "$SUDO_KEEPALIVE" 2>/dev/null || true' EXIT
 
@@ -189,16 +291,42 @@ trap 'kill "$SUDO_KEEPALIVE" 2>/dev/null || true' EXIT
 # Packages
 # ---------------------------------------------------------------------------
 ensure_aur() {
-  if [[ -n "$AUR_HELPER" ]]; then return; fi
+  if [[ -n "$AUR_HELPER" ]]; then return 0; fi
   if command -v yay >/dev/null 2>&1; then AUR_HELPER=yay
   elif command -v paru >/dev/null 2>&1; then AUR_HELPER=paru
   else
     say "Installing yay-bin (AUR helper)"
     sudo pacman -S --needed --noconfirm base-devel git
-    local tmp
+    local tmp rc
     tmp="$(mktemp -d)"
+    LAST_ERROR_ACTION=""
     git clone --depth=1 https://aur.archlinux.org/yay-bin.git "$tmp/yay-bin"
-    ( cd "$tmp/yay-bin" && makepkg -si --noconfirm )
+    rc=$?
+    if ((rc != 0)) && [[ "$LAST_ERROR_ACTION" == retry-ok ]]; then
+      rc=0
+    fi
+    if ((rc != 0)); then
+      warn "could not clone yay-bin"
+      rm -rf "$tmp"
+      return 1
+    fi
+    if ! pushd "$tmp/yay-bin" >/dev/null; then
+      warn "could not enter the yay-bin build directory"
+      rm -rf "$tmp"
+      return 1
+    fi
+    LAST_ERROR_ACTION=""
+    makepkg -si --noconfirm
+    rc=$?
+    if ((rc != 0)) && [[ "$LAST_ERROR_ACTION" == retry-ok ]]; then
+      rc=0
+    fi
+    popd >/dev/null || true
+    if ((rc != 0)); then
+      warn "could not build yay-bin"
+      rm -rf "$tmp"
+      return 1
+    fi
     rm -rf "$tmp"
     AUR_HELPER=yay
   fi
@@ -218,8 +346,21 @@ install_pkgs() {
   fi
   if ((${#aur[@]})); then
     ensure_aur
+    if [[ -z "$AUR_HELPER" ]]; then
+      warn "AUR helper unavailable; skipping: ${aur[*]}"
+      return 0
+    fi
     "$AUR_HELPER" -S --needed --noconfirm "${aur[@]}"
   fi
+  return 0
+}
+
+spicetify_available() {
+  command -v spicetify >/dev/null 2>&1 ||
+    [[ -x "$HOME/.spicetify/spicetify" ]] ||
+    [[ -x "$HOME/.local/bin/spicetify" ]] ||
+    pacman -Qq spicetify-bin >/dev/null 2>&1 ||
+    pacman -Qq spicetify-cli >/dev/null 2>&1
 }
 
 say "Installing Noctalia first (the shell must exist before its config)"
@@ -235,7 +376,12 @@ CORE_PKGS=(
 )
 EXTRA_PKGS=()
 [[ $DISCORD == 1 ]] && EXTRA_PKGS+=(vesktop-bin)
-[[ $SPOTIFY == 1 ]] && EXTRA_PKGS+=(spotify spicetify-cli)
+if [[ $SPOTIFY == 1 ]]; then
+  EXTRA_PKGS+=(spotify)
+  # The source AUR package (spicetify-cli) needs go + pnpm and often fails to
+  # build. The prebuilt package is the reliable choice.
+  spicetify_available || EXTRA_PKGS+=(spicetify-bin)
+fi
 [[ $WAYVIBES == 1 ]] && EXTRA_PKGS+=(wayvibes-git)
 case "$BROWSER" in
   floorp) EXTRA_PKGS+=(floorp-bin) ;;
@@ -295,21 +441,230 @@ backup() {
 }
 
 install_text() {
-  local src="$1" dest="$2" kind="${3:-plain}"
-  shift 3 || true
+  local src="$1" dest="$2" kind="${3:-plain}" rc
+  if (($# >= 3)); then shift 3; else shift $#; fi
   backup "$dest"
   mkdir -p "$(dirname "$dest")"
+  LAST_ERROR_ACTION=""
   python3 "$SELF_DIR/scripts/render.py" "$kind" "$src" "$dest" --home "$HOME" "$@"
+  rc=$?
+  if ((rc != 0)) && [[ "$LAST_ERROR_ACTION" == retry-ok ]]; then
+    rc=0
+  fi
+  if ((rc != 0)); then
+    warn "could not render $dest; skipping"
+    return 0
+  fi
   chmod 0644 "$dest"
   ok "$dest"
 }
 
 install_copy() {
-  local src="$1" dest="$2"
+  local src="$1" dest="$2" rc
   backup "$dest"
   mkdir -p "$(dirname "$dest")"
+  LAST_ERROR_ACTION=""
   cp -a "$src" "$dest"
+  rc=$?
+  if ((rc != 0)) && [[ "$LAST_ERROR_ACTION" == retry-ok ]]; then
+    rc=0
+  fi
+  if ((rc != 0)); then
+    warn "could not copy to $dest; skipping"
+    return 0
+  fi
   ok "$dest"
+}
+
+# ---------------------------------------------------------------------------
+# Spicetify helpers
+# ---------------------------------------------------------------------------
+resolve_spicetify() {
+  if command -v spicetify >/dev/null 2>&1; then
+    command -v spicetify
+  elif [[ -x "$HOME/.spicetify/spicetify" ]]; then
+    printf '%s\n' "$HOME/.spicetify/spicetify"
+  elif [[ -x "$HOME/.local/bin/spicetify" ]]; then
+    printf '%s\n' "$HOME/.local/bin/spicetify"
+  else
+    return 1
+  fi
+}
+
+install_spicetify_fallback() {
+  local api url tmp dest
+  command -v curl >/dev/null 2>&1 || { warn "curl is required for the Spicetify fallback"; return 1; }
+  say "Downloading the official prebuilt Spicetify release"
+  api="$(curl -fsSL https://api.github.com/repos/spicetify/cli/releases/latest)" || return 1
+  url="$(printf '%s' "$api" | python3 -c '
+import json, sys
+data = json.load(sys.stdin)
+for asset in data.get("assets", []):
+    if asset.get("name", "").endswith("linux-amd64.tar.gz"):
+        print(asset["browser_download_url"])
+        break
+' 2>/dev/null)" || true
+  [[ -n "$url" ]] || { warn "could not find the Spicetify Linux release"; return 1; }
+  dest="$HOME/.local/opt/spicetify"
+  tmp="$(mktemp -d)"
+  mkdir -p "$dest" "$HOME/.local/bin"
+  if ! curl -fsSL "$url" -o "$tmp/spicetify.tar.gz"; then
+    rm -rf "$tmp"
+    return 1
+  fi
+  if ! tar -xzf "$tmp/spicetify.tar.gz" -C "$dest"; then
+    rm -rf "$tmp"
+    return 1
+  fi
+  rm -rf "$tmp"
+  chmod +x "$dest/spicetify"
+  ln -sfn "$dest/spicetify" "$HOME/.local/bin/spicetify"
+  ok "Spicetify installed in $dest"
+}
+
+detect_spotify_path() {
+  local bin dir
+  if [[ -d /opt/spotify ]]; then
+    printf '%s\n' /opt/spotify
+    return 0
+  fi
+  bin="$(command -v spotify 2>/dev/null || true)"
+  if [[ -n "$bin" ]]; then
+    bin="$(readlink -f "$bin")"
+    dir="$(dirname "$bin")"
+    if [[ -d "$dir/Apps" ]]; then
+      printf '%s\n' "$dir"
+      return 0
+    fi
+  fi
+  return 1
+}
+
+ensure_spotify_prefs() {
+  local prefs="$HOME/.config/spotify/prefs" i spotify_bin
+  SPOTIFY_PREFS_OK=0
+  if [[ -f "$prefs" ]]; then
+    SPOTIFY_PREFS_OK=1
+    return 0
+  fi
+  if pgrep -x spotify >/dev/null 2>&1; then
+    warn "Spotify is already running; close it and rerun the installer"
+    return 0
+  fi
+  if [[ -z "${WAYLAND_DISPLAY:-}" && -z "${DISPLAY:-}" ]]; then
+    warn "No graphical session found; launch Spotify once and rerun"
+    return 0
+  fi
+  spotify_bin="$(command -v spotify 2>/dev/null || true)"
+  if [[ -z "$spotify_bin" ]]; then
+    warn "the spotify command was not found"
+    return 0
+  fi
+  say "Launching Spotify once to create ~/.config/spotify/prefs"
+  setsid "$spotify_bin" >/dev/null 2>&1 &
+  for i in $(seq 1 20); do
+    [[ -f "$prefs" ]] && break
+    sleep 1
+  done
+  # Only Spotify was running when we launched it, so it is safe to close it.
+  pkill -x spotify >/dev/null 2>&1 || true
+  for i in $(seq 1 10); do
+    pgrep -x spotify >/dev/null 2>&1 || break
+    sleep 1
+  done
+  [[ -f "$prefs" ]] && SPOTIFY_PREFS_OK=1
+  return 0
+}
+
+setup_spicetify() {
+  local spicetify_bin spotify_path prefs patch_rc rc
+  SPOTIFY_PREFS_OK=0
+
+  if ! spicetify_bin="$(resolve_spicetify)"; then
+    warn "Spicetify is not installed; trying the official prebuilt release"
+    if ! install_spicetify_fallback; then
+      warn "could not install Spicetify"
+      warn "Install it manually (AUR: spicetify-bin) and rerun the installer"
+      return 0
+    fi
+    if ! spicetify_bin="$(resolve_spicetify)"; then
+      warn "Spicetify still could not be found after the fallback install"
+      return 0
+    fi
+  fi
+  say "Using Spicetify: $spicetify_bin"
+
+  if ! spotify_path="$(detect_spotify_path)"; then
+    warn "could not find the Spotify installation directory"
+    warn "Install Spotify first, then rerun the installer"
+    return 0
+  fi
+  spotify_path="${spotify_path%/}/"
+  prefs="$HOME/.config/spotify/prefs"
+
+  install_text "$SELF_DIR/config/spicetify/config-xpui.ini" "$HOME/.config/spicetify/config-xpui.ini"
+  if [[ ! -f "$HOME/.config/spicetify/config-xpui.ini" ]]; then
+    warn "Spicetify config was not written; skipping"
+    return 0
+  fi
+  sed -i "s|__SPOTIFY_PATH__|$spotify_path|g" "$HOME/.config/spicetify/config-xpui.ini"
+  install_text "$SELF_DIR/config/spicetify/Themes/marketplace/color.ini" "$HOME/.config/spicetify/Themes/marketplace/color.ini"
+  mkdir -p "$HOME/.config/spicetify/CustomApps/marketplace"
+  backup "$HOME/.config/spicetify/CustomApps/marketplace"
+  LAST_ERROR_ACTION=""
+  cp -a "$SELF_DIR/config/spicetify/CustomApps/marketplace/." "$HOME/.config/spicetify/CustomApps/marketplace/"
+  rc=$?
+  if ((rc != 0)) && [[ "$LAST_ERROR_ACTION" == retry-ok ]]; then
+    rc=0
+  fi
+  if ((rc != 0)); then
+    warn "could not copy the Marketplace app; skipping"
+    return 0
+  fi
+  ok "$HOME/.config/spicetify/CustomApps/marketplace"
+
+  LAST_ERROR_ACTION=""
+  ensure_spotify_prefs
+  if ((SPOTIFY_PREFS_OK != 1)); then
+    warn "Spotify prefs are still missing; skipping the patch"
+    warn "Launch Spotify once, then run: $spicetify_bin backup apply"
+    return 0
+  fi
+
+  "$spicetify_bin" config \
+    spotify_path "$spotify_path" \
+    prefs_path "$prefs" \
+    current_theme marketplace
+  rc=$?
+  if ((rc != 0)) && [[ "$LAST_ERROR_ACTION" == retry-ok ]]; then
+    rc=0
+  fi
+  if ((rc != 0)); then
+    warn "could not update the Spicetify settings"
+    return 0
+  fi
+
+  LAST_ERROR_ACTION=""
+  if pgrep -x spotify >/dev/null 2>&1; then
+    warn "Spotify is running; if the patch fails, close it and choose Retry"
+  fi
+  if [[ -f "$HOME/.local/state/spicetify/Backup/xpui.spa" ||
+        -f "$HOME/.config/spicetify/Backup/xpui.spa" ]]; then
+    "$spicetify_bin" apply
+  else
+    "$spicetify_bin" backup apply
+  fi
+  patch_rc=$?
+  if ((patch_rc != 0)) && [[ "$LAST_ERROR_ACTION" == retry-ok ]]; then
+    patch_rc=0
+  fi
+  if ((patch_rc != 0)); then
+    warn "Spicetify could not patch Spotify"
+    warn "Close Spotify, then run: $spicetify_bin backup apply"
+    return 0
+  fi
+
+  ok "Spicetify patched Spotify"
 }
 
 # ---------------------------------------------------------------------------
@@ -391,25 +746,7 @@ fi
 
 if [[ $SPOTIFY == 1 ]]; then
   say "Installing Spicetify (Marketplace + Noctalia color sync)"
-  SPOTIFY_PATH="/opt/spotify"
-  if [[ ! -d "$SPOTIFY_PATH" ]]; then
-    SPOTIFY_BIN="$(command -v spotify 2>/dev/null || true)"
-    [[ -n "$SPOTIFY_BIN" ]] && SPOTIFY_PATH="$(dirname "$(readlink -f "$SPOTIFY_BIN")")"
-  fi
-  install_text "$SELF_DIR/config/spicetify/config-xpui.ini" "$HOME/.config/spicetify/config-xpui.ini"
-  sed -i "s|__SPOTIFY_PATH__|$SPOTIFY_PATH|g" "$HOME/.config/spicetify/config-xpui.ini"
-  install_text "$SELF_DIR/config/spicetify/Themes/marketplace/color.ini" "$HOME/.config/spicetify/Themes/marketplace/color.ini"
-  mkdir -p "$HOME/.config/spicetify/CustomApps/marketplace"
-  backup "$HOME/.config/spicetify/CustomApps/marketplace"
-  cp -a "$SELF_DIR/config/spicetify/CustomApps/marketplace/." "$HOME/.config/spicetify/CustomApps/marketplace/"
-  ok "$HOME/.config/spicetify/CustomApps/marketplace"
-  if [[ -f "$HOME/.config/spotify/prefs" ]] && ! pgrep -x spotify >/dev/null 2>&1; then
-    if command -v spicetify >/dev/null 2>&1; then
-      spicetify backup apply >/dev/null 2>&1 && ok "Spicetify patched Spotify" || warn "Spicetify could not patch Spotify yet"
-    fi
-  else
-    warn "Launch Spotify once, then run: spicetify backup apply"
-  fi
+  setup_spicetify
 fi
 
 if [[ $WAYVIBES == 1 ]]; then
@@ -586,6 +923,7 @@ if git -C "$SELF_DIR" rev-parse --short HEAD >/dev/null 2>&1; then
   git -C "$SELF_DIR" rev-parse --short HEAD > "$HOME/.config/mintalia/commit"
 fi
 
+print_ignored_steps
 printf '\n%s\n' "${C_GREEN}${C_BOLD}mintalia is installed.${C_RESET}"
 cat <<EOF
 
@@ -605,7 +943,7 @@ if [[ "$BROWSER" == "zen" ]]; then
   printf '  Zen: open it once, then Noctalia applies the theme on the next color change.\n'
 fi
 if [[ $SPOTIFY == 1 ]]; then
-  printf '  Spotify: if it is unthemed, run "spicetify backup apply" once.\n'
+  printf '  Spotify: if it is unthemed, close it and run "spicetify backup apply" once.\n'
   printf '  Spotify colors: Noctalia → Settings → Templates → apply "spicetify-noctalia".\n'
 fi
 if [[ "$BROWSER" == "floorp" ]]; then
