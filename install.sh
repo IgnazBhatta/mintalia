@@ -540,6 +540,24 @@ detect_spotify_path() {
   return 1
 }
 
+ensure_spotify_writable() {
+  local path="$1" apps="$1/Apps" rc
+  [[ -d "$apps" ]] || return 0
+  [[ -w "$apps" ]] && return 0
+  say "Spotify's app files are not writable; fixing ownership of $apps"
+  LAST_ERROR_ACTION=""
+  sudo chown -R "$(id -un):$(id -gn)" "$apps"
+  rc=$?
+  if ((rc != 0)) && [[ "$LAST_ERROR_ACTION" == retry-ok ]]; then
+    rc=0
+  fi
+  if ((rc != 0)); then
+    warn "could not change ownership of $apps"
+    return 1
+  fi
+  ok "Spotify app files are writable now"
+}
+
 ensure_spotify_prefs() {
   local prefs="$HOME/.config/spotify/prefs" i spotify_bin
   SPOTIFY_PREFS_OK=0
@@ -600,6 +618,7 @@ setup_spicetify() {
     return 0
   fi
   spotify_path="${spotify_path%/}/"
+  ensure_spotify_writable "$spotify_path"
   prefs="$HOME/.config/spotify/prefs"
 
   local cfg="$HOME/.config/spicetify/config-xpui.ini"
@@ -865,6 +884,7 @@ if [[ $INSTALL_SDDM == 1 ]]; then
   sudo install -Dm644 "$TMP_CONF" "$SDDM_THEME/theme.conf"
   rm -f "$TMP_CONF"
   backup /etc/sddm.conf.d/99-mintalia.conf
+  sudo mkdir -p /etc/sddm.conf.d
   printf '[Theme]\nCurrent=mintalia\n' | sudo tee /etc/sddm.conf.d/99-mintalia.conf >/dev/null
   if ! systemctl is-enabled sddm.service >/dev/null 2>&1; then
     sudo systemctl enable sddm.service >/dev/null 2>&1 || true
