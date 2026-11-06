@@ -116,7 +116,8 @@ the ignored steps at the end.
 - **Nautilus** with `adw-gtk3-dark`, Papirus-Dark icons, and capitaine cursors.
 - **SDDM** theme installed as `/usr/share/sddm/themes/mintalia` with the
   `wallhaven-zpvrov` wallpaper, a 12 px blur, and its own
-  `/etc/sddm.conf.d/99-mintalia.conf` (skip with `--no-sddm`).
+  `/etc/sddm.conf.d/99-mintalia.conf` (skip with `--no-sddm`). The blur needs
+  `qt6-5compat` for `Qt5Compat.GraphicalEffects`; the installer adds it automatically.
 - **btop** + **cava** Noctalia themes, KDE color scheme, Zed theme.
 - Optional **Vesktop**, **Spotify/Spicetify**, **Wayvibes**, **Floorp/Zen**.
 

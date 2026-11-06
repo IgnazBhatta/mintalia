@@ -374,6 +374,8 @@ CORE_PKGS=(
   ttf-jetbrains-mono-nerd ttf-meslo-nerd
   dconf playerctl polkit xdg-desktop-portal-gtk
 )
+# The SDDM theme imports Qt5Compat.GraphicalEffects for its blur effect.
+[[ $INSTALL_SDDM == 1 ]] && CORE_PKGS+=(qt6-5compat)
 EXTRA_PKGS=()
 [[ $DISCORD == 1 ]] && EXTRA_PKGS+=(vesktop-bin)
 if [[ $SPOTIFY == 1 ]]; then
@@ -541,21 +543,23 @@ detect_spotify_path() {
 }
 
 ensure_spotify_writable() {
-  local path="$1" apps="$1/Apps" rc
+  local path="${1%/}" apps="${1%/}/Apps" rc
   [[ -d "$apps" ]] || return 0
-  [[ -w "$apps" ]] && return 0
-  say "Spotify's app files are not writable; fixing ownership of $apps"
+  if [[ -w "$path" && -w "$apps" ]]; then
+    return 0
+  fi
+  say "Spotify's files are not writable; fixing ownership of $path"
   LAST_ERROR_ACTION=""
-  sudo chown -R "$(id -un):$(id -gn)" "$apps"
+  sudo chown -R "$(id -un):$(id -gn)" "$path"
   rc=$?
   if ((rc != 0)) && [[ "$LAST_ERROR_ACTION" == retry-ok ]]; then
     rc=0
   fi
   if ((rc != 0)); then
-    warn "could not change ownership of $apps"
+    warn "could not change ownership of $path"
     return 1
   fi
-  ok "Spotify app files are writable now"
+  ok "Spotify files are writable now"
 }
 
 ensure_spotify_prefs() {
@@ -619,7 +623,11 @@ setup_spicetify() {
     return 0
   fi
   spotify_path="${spotify_path%/}/"
-  ensure_spotify_writable "$spotify_path"
+  if ! ensure_spotify_writable "$spotify_path"; then
+    warn "Spotify is not writable; skipping the patch"
+    warn "Make $spotify_path writable by $(id -un), then rerun the installer"
+    return 0
+  fi
   prefs="$HOME/.config/spotify/prefs"
 
   local cfg="$HOME/.config/spicetify/config-xpui.ini"
